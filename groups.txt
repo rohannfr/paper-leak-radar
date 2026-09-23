@@ -1,0 +1,8 @@
+# groups.txt — List of Telegram groups/channels to scan
+# One username or invite link per line. Lines starting with # are ignored.
+
+# Example JEE / NEET groups (replace with actual groups you want to monitor)
+IIT_JEE_Mains_Advance_Notes_pdf
+# neet_paper_leaks_2024
+# cbse_board_papers
+# JEE_NEET_leak_channel

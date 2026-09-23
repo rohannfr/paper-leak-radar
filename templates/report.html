@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paper Leak Radar — Detection & Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #151b2c;
+      --surface-hover: #1c243a;
+      --card-bg: #111625;
+      --border: #232d42;
+      --border-focus: #4f46e5;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.25);
+      --leak: #ef4444;
+      --leak-bg: rgba(239, 68, 68, 0.12);
+      --similar: #f59e0b;
+      --similar-bg: rgba(245, 158, 11, 0.12);
+      --unrelated: #10b981;
+      --unrelated-bg: rgba(16, 185, 129, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    /* Header Navbar */
+    .navbar {
+      background: rgba(21, 27, 44, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      background: linear-gradient(135deg, #fff 40%, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--bg);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--surface-hover);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .tab-badge {
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+
+    /* Container */
+    .main-container {
+      max-width: 1280px;
+      margin: 28px auto;
+      padding: 0 24px;
+    }
+
+    /* Tab Panes */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Grid Layout for Setup Tab */
+    .setup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .setup-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Section Cards */
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .section-card h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-card .subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    /* Drag and Drop File Upload */
+    .upload-box {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--card-bg);
+      position: relative;
+    }
+
+    .upload-box:hover,
+    .upload-box.dragover {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    .upload-box input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .upload-icon {
+      font-size: 36px;
+      margin-bottom: 10px;
+      color: var(--primary);
+    }
+
+    .upload-text {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .upload-hint {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .selected-file-badge {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid var(--primary);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: #fff;
+      font-weight: 600;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .form-control {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 120px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .chip {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      border-color: var(--primary);
+      color: var(--text);
+    }
+
+    /* Sliders */
+    .range-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .range-wrap input[type="range"] {
+      flex: 1;
+      accent-color: var(--primary);
+    }
+
+    .range-val {
+      font-weight: 700;
+      font-size: 0.95rem;
+      min-width: 45px;
+      text-align: right;
+      color: var(--primary);
+    }
+
+    /* Primary Start Button */
+    .btn-submit {
+      width: 100%;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none;
+      border-radius: var(--radius-md);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 20px var(--primary-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px var(--primary-glow);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Progress & Terminal Box */
+    .progress-box {
+      margin-top: 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      display: none;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .progress-bar-bg {
+      height: 8px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .terminal-console {
+      background: #07090e;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #38bdf8;
+      height: 140px;
+      overflow-y: auto;
+      line-height: 1.6;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .terminal-line {
+      margin-bottom: 2px;
+    }
+
+    /* Dashboard Tab Stats Row */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .stat-card.total::before {
+      background: var(--primary);
+    }
+
+    .stat-card.leaks::before {
+      background: var(--leak);
+    }
+
+    .stat-card.similar::before {
+      background: var(--similar);
+    }
+
+    .stat-card.verified::before {
+      background: var(--unrelated);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .stat-val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    /* Filter & Search Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+      background: var(--surface);
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .filter-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+      color: var(--text);
+      border-color: var(--primary);
+    }
+
+    .filter-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 240px;
+    }
+
+    .search-box input {
+      padding-left: 36px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+    }
+
+    /* Result Cards */
+    .results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .res-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      transition: border-color 0.2s ease;
+    }
+
+    .res-card.verdict-LIKELY_LEAK {
+      border-left: 5px solid var(--leak);
+    }
+
+    .res-card.verdict-SIMILAR_TOPIC {
+      border-left: 5px solid var(--similar);
+    }
+
+    .res-card.verdict-UNRELATED {
+      border-left: 5px solid var(--unrelated);
+    }
+
+    .res-header {
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .res-header:hover {
+      background: var(--surface-hover);
+    }
+
+    .res-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .res-file {
+      font-size: 0.82rem;
+      color: var(--primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .res-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .badge-pill.leak {
+      background: var(--leak-bg);
+      color: var(--leak);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-pill.similar {
+      background: var(--similar-bg);
+      color: var(--similar);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-pill.unrelated {
+      background: var(--unrelated-bg);
+      color: var(--unrelated);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .res-body {
+      display: none;
+      padding: 0 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .res-body.open {
+      display: block;
+    }
+
+    /* Score Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .metric-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+
+    .metric-lbl {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .metric-val {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* AI Reasoning Box */
+    .ai-reasoning {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .ai-reasoning strong {
+      color: var(--primary);
+    }
+
+    /* Snippets Comparator */
+    .snippets-container {
+      margin-bottom: 20px;
+    }
+
+    .snippets-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+
+    .snippet-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .snippet-pair {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .snippet-card {
+      background: #080b13;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .snippet-card-header {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    /* Keyword Tags */
+    .kw-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+
+    .kw-tag {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Action Buttons */
+    .actions-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-act {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-leak {
+      background: var(--leak);
+      color: #fff;
+    }
+
+    .btn-reject {
+      background: var(--unrelated);
+      color: #fff;
+    }
+
+    .btn-review {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-act:hover {
+      opacity: 0.85;
+      transform: translateY(-1px);
+    }
+
+    .human-status-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-left: auto;
+    }
+
+    .human-status-badge.confirmed {
+      background: var(--leak-bg);
+      color: var(--leak);
+    }
+
+    .human-status-badge.rejected {
+      background: var(--unrelated-bg);
+      color: var(--unrelated);
+    }
+
+    .empty-placeholder {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-placeholder h3 {
+      font-size: 1.2rem;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Top Navbar -->
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div class="brand-text">
+        <h1>Paper Leak Radar</h1>
+        <p>Telegram Exam Intelligence & Verification System</p>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-setup', this)">
+        🎯 Start Scan
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-dashboard', this)">
+        📊 Flagged Leaks <span class="tab-badge" id="badge-count">{{ total }}</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-settings', this)">
+        ⚙️ Settings & Export
+      </button>
+    </div>
+  </nav>
+
+  <div class="main-container">
+
+    <!-- 🎯 TAB 1: SCAN SETUP & CONTROL CENTER -->
+    <div id="tab-setup" class="tab-pane active">
+      <div class="setup-grid">
+
+        <!-- Left: Paper Upload & Meta -->
+        <div class="section-card">
+          <h2>📄 1. Reference Paper Ground Truth</h2>
+          <p class="subtitle">Upload the authentic exam paper (PDF or image) to compare against Telegram content.</p>
+
+          <form id="scan-form" onsubmit="handleStartScan(event)">
+            <div class="upload-box" id="drop-zone">
+              <input type="file" id="reference-file-input" name="reference_file" accept=".pdf,.png,.jpg,.jpeg"
+                onchange="handleFileSelect(this)">
+              <div class="upload-icon">📁</div>
+              <div class="upload-text">Click or Drag & Drop Reference Paper</div>
+              <div class="upload-hint">Supports PDF, PNG, JPG exam document files</div>
+            </div>
+
+            <div class="selected-file-badge" id="file-badge">
+              <span id="file-name-text">filename.pdf</span>
+              <button type="button" style="background:none;border:none;color:#fff;cursor:pointer;"
+                onclick="clearFileSelect()">✕</button>
+            </div>
+
+            <div style="margin-top: 24px;">
+              <div class="form-group">
+                <label>Exam Subject</label>
+                <input type="text" name="subject" class="form-control" value="Physics JEE Mains"
+                  placeholder="e.g. Physics JEE Mains">
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group">
+                  <label>Exam Year</label>
+                  <input type="text" name="year" class="form-control" value="2024" placeholder="2024">
+                </div>
+                <div class="form-group">
+                  <label>Authority / Board</label>
+                  <input type="text" name="board" class="form-control" value="NTA" placeholder="NTA / CBSE">
+                </div>
+              </div>
+            </div>
+        </div>
+
+        <!-- Right: Telegram Groups & Parameters -->
+        <div class="section-card">
+          <h2>💬 2. Telegram Target Groups</h2>
+          <p class="subtitle">Specify group handles or channel links to monitor.</p>
+
+          <div class="form-group">
+            <label>Telegram Groups / Channels (one per line)</label>
+            <textarea id="groups-textarea" name="groups" class="form-control"
+              placeholder="IIT_JEE_Mains_Advance_Notes_pdf">{{ groups | join('\n') }}</textarea>
+
+            <div class="preset-chips">
+              <span class="chip" onclick="addPreset('IIT_JEE_Mains_Advance_Notes_pdf')">+ JEE Notes</span>
+              <span class="chip" onclick="addPreset('neet_paper_leaks_2024')">+ NEET Channel</span>
+              <span class="chip" onclick="addPreset('cbse_board_papers')">+ CBSE Board</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 24px;">
+            <label>Keyword Jaccard Threshold</label>
+            <div class="range-wrap">
+              <input type="range" name="threshold" min="0.1" max="0.7" step="0.05" value="0.3"
+                oninput="document.getElementById('thresh-val').innerText = Math.round(this.value * 100) + '%'">
+              <span class="range-val" id="thresh-val">30%</span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">Only documents matching ≥ this keyword
+              overlap pass to AI semantic analysis.</div>
+          </div>
+
+          <button type="submit" class="btn-submit" id="btn-scan">
+            <span>🚀 Run Paper Leak Detection Pipeline</span>
+          </button>
+          </form>
+
+          <!-- Progress Box -->
+          <div class="progress-box" id="progress-container">
+            <div class="progress-header">
+              <span id="progress-stage">Initializing...</span>
+              <span id="progress-pct">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <div class="terminal-console" id="terminal">
+              <div class="terminal-line">> Pipeline initializing...</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 📊 TAB 2: FLAGGED LEAKS DASHBOARD -->
+    <div id="tab-dashboard" class="tab-pane">
+
+      <!-- Stats Row -->
+      <div class="stats-grid">
+        <div class="stat-card total">
+          <div class="stat-label">Total Flagged</div>
+          <div class="stat-val" id="stat-total">{{ total }}</div>
+        </div>
+        <div class="stat-card leaks">
+          <div class="stat-label">🚨 Likely Leaks</div>
+          <div class="stat-val" style="color:var(--leak);" id="stat-leaks">{{ likely_leaks }}</div>
+        </div>
+        <div class="stat-card similar">
+          <div class="stat-label">🟡 Similar Topic</div>
+          <div class="stat-val" style="color:var(--similar);" id="stat-similar">{{ similar_topic }}</div>
+        </div>
+        <div class="stat-card verified">
+          <div class="stat-label">👤 Human Confirmed</div>
+          <div class="stat-val" style="color:var(--unrelated);" id="stat-verified">0</div>
+        </div>
+      </div>
+
+      <!-- Filter & Search Bar -->
+      <div class="filter-bar">
+        <div class="filter-buttons">
+          <button class="filter-btn active" onclick="filterResults('ALL', this)">All Results</button>
+          <button class="filter-btn" onclick="filterResults('LIKELY_LEAK', this)">🚨 Likely Leaks</button>
+          <button class="filter-btn" onclick="filterResults('SIMILAR_TOPIC', this)">🟡 Similar Topic</button>
+          <button class="filter-btn" onclick="filterResults('CONFIRMED_LEAK', this)">👤 Confirmed</button>
+          <button class="filter-btn" onclick="filterResults('FALSE_POSITIVE', this)">✅ False Positives</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="filter-btn" id="btn-refresh" onclick="refreshResults()" title="Reload latest results">
+            🔄 Refresh
+          </button>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" class="form-control" placeholder="Search group, file, keyword..."
+              onkeyup="handleSearch()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Results List -->
+      <div class="results-list" id="results-container">
+        {% if results %}
+        {% for r in results %}
+        {% set v = r.get('verdict', {}) %}
+        {% set verdict = v.get('verdict', 'UNRELATED') %}
+        {% set rid = r.get('result_id', loop.index|string) %}
+        {% set sem = r.get('semantic', {}) %}
+        {% set kw = r.get('keywords', {}) %}
+        {% set hd = r.get('human_decision') %}
+
+        <div class="res-card verdict-{{ verdict }}" data-verdict="{{ verdict }}" data-human="{{ hd or '' }}"
+          data-search="{{ r.get('group_title','') }} {{ r.get('filename','') }} {{ r.get('matched_keywords', []) | join(' ') }}">
+          <div class="res-header" onclick="toggleCard('{{ rid }}')">
+            <div>
+              <div class="res-title">
+                <span>{{ r.get('group_title', 'Unknown Group') }}</span>
+                <span class="res-file">{{ r.get('filename', '') }}</span>
+              </div>
+              <div class="res-sub">
+                Msg ID: #{{ r.get('message_id','') }} &nbsp;·&nbsp; {{ r.get('date','') }} &nbsp;·&nbsp;
+                AI Mode: {{ 'Local LLM' if v.get('used_llm') else 'Rule Engine' }}
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span
+                class="badge-pill {{ 'leak' if verdict == 'LIKELY_LEAK' else ('similar' if verdict == 'SIMILAR_TOPIC' else 'unrelated') }}">
+                {% if verdict == 'LIKELY_LEAK' %}🚨 Likely Leak
+                {% elif verdict == 'SIMILAR_TOPIC' %}🟡 Similar Topic
+                {% else %}✅ Unrelated{% endif %}
+              </span>
+
+              {% if hd %}
+              <span class="human-status-badge {{ 'confirmed' if hd == 'CONFIRMED_LEAK' else 'rejected' }}">
+                {{ '👤 Confirmed Leak' if hd == 'CONFIRMED_LEAK' else '✅ False Positive' }}
+              </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="res-body" id="body-{{ rid }}">
+
+            <!-- Scores -->
+            <div class="metrics-grid">
+              <div class="metric-box">
+                <div class="metric-lbl">AI Confidence</div>
+                <div class="metric-val" style="color:var(--primary)">{{ (v.get('confidence',0)*100)|int }}%</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Keyword Overlap</div>
+                <div class="metric-val">{{ (kw.get('jaccard',0)*100)|int }}%</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Full Doc Similarity</div>
+                <div class="metric-val">{{ (sem.get('full_doc_sim',0)*100)|int }}%</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Top Chunk Sim</div>
+                <div class="metric-val">{{ (sem.get('avg_top_chunk_sim',0)*100)|int }}%</div>
+              </div>
+            </div>
+
+            <!-- AI Verdict reasoning -->
+            <div class="ai-reasoning">
+              <strong>🤖 AI Reasoning Analysis:</strong> {{ v.get('reasoning', 'No reasoning logged.') }}
+            </div>
+
+            <!-- Matched Keywords -->
+            {% if r.get('matched_keywords') %}
+            <div
+              style="margin-bottom:12px;font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">
+              Matched Keywords</div>
+            <div class="kw-cloud">
+              {% for token in r.get('matched_keywords', [])[:24] %}
+              <span class="kw-tag">{{ token }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Side by Side Chunks -->
+            {% if sem.get('top_chunks') %}
+            <div class="snippets-container">
+              <div class="snippets-title">Side-by-Side Text Snippet Comparison</div>
+              {% for chunk in sem.get('top_chunks', [])[:2] %}
+              <div class="snippet-pair">
+                <div class="snippet-card">
+                  <div class="snippet-card-header">Reference Paper Chunk</div>
+                  {{ chunk.get('ref_snippet', '')[:300] }}
+                </div>
+                <div class="snippet-card">
+                  <div class="snippet-card-header">Telegram File Chunk (Sim: {{ (chunk.get('similarity',0)*100)|int }}%)
+                  </div>
+                  {{ chunk.get('cand_snippet', '')[:300] }}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Human Actions -->
+            <div class="actions-row">
+              <button class="btn-act btn-leak" onclick="verifyResult('{{ rid }}', 'CONFIRMED_LEAK')">🚨 Confirm Paper
+                Leak</button>
+              <button class="btn-act btn-reject" onclick="verifyResult('{{ rid }}', 'FALSE_POSITIVE')">✅ Mark False
+                Positive</button>
+              <button class="btn-act btn-review" onclick="verifyResult('{{ rid }}', 'NEEDS_REVIEW')">🔍 Needs
+                Review</button>
+            </div>
+
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-placeholder">
+          <h3>No Scan Results Available Yet</h3>
+          <p>Go to the <strong>Start Scan</strong> tab to upload a paper and run the scan!</p>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ⚙️ TAB 3: SETTINGS & EXPORT -->
+    <div id="tab-settings" class="tab-pane">
+      <div class="section-card">
+        <h2>⚙️ System Status & Export</h2>
+        <p class="subtitle">Manage saved data and download scan reports.</p>
+
+        <div style="display:flex;gap:14px;margin-top:20px;">
+          <a href="/api/export" class="btn-act btn-review" download style="text-decoration:none;">📥 Export Results
+            JSON</a>
+          <button class="btn-act btn-review" onclick="saveGroupsToServer()">💾 Save Default Group List</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const TAB_IDS = ['tab-setup', 'tab-dashboard', 'tab-settings'];
+    const TAB_STORAGE_KEY = 'plr_active_tab';
+
+    function saveActiveTab(tabId) {
+      if (TAB_IDS.includes(tabId)) {
+        sessionStorage.setItem(TAB_STORAGE_KEY, tabId);
+      }
+    }
+
+    function restoreSavedTab() {
+      const saved = sessionStorage.getItem(TAB_STORAGE_KEY);
+      if (saved && TAB_IDS.includes(saved)) {
+        switchTab(saved);
+      }
+    }
+
+    function switchTab(tabId, tabButton) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(tabId).classList.add('active');
+      const btn = tabButton || document.querySelectorAll('.tab-btn')[TAB_IDS.indexOf(tabId)];
+      if (btn) btn.classList.add('active');
+      saveActiveTab(tabId);
+    }
+
+    function refreshResults() {
+      const btn = document.getElementById('btn-refresh');
+      saveActiveTab('tab-dashboard');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳ Refreshing...';
+      }
+      window.location.reload();
+    }
+
+    function handleFileSelect(input) {
+      if (input.files && input.files[0]) {
+        const f = input.files[0];
+        document.getElementById('file-name-text').innerText = f.name + ' (' + (f.size / 1024 / 1024).toFixed(2) + ' MB)';
+        document.getElementById('file-badge').style.display = 'flex';
+        document.getElementById('drop-zone').style.borderColor = 'var(--primary)';
+      }
+    }
+
+    function clearFileSelect() {
+      document.getElementById('reference-file-input').value = '';
+      document.getElementById('file-badge').style.display = 'none';
+      document.getElementById('drop-zone').style.borderColor = 'var(--border)';
+    }
+
+    function addPreset(group) {
+      const area = document.getElementById('groups-textarea');
+      if (!area.value.includes(group)) {
+        area.value = area.value.trim() + '\n' + group;
+      }
+    }
+
+    function toggleCard(id) {
+      const b = document.getElementById('body-' + id);
+      if (b) b.classList.toggle('open');
+    }
+
+    async function handleStartScan(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-scan');
+      btn.disabled = true;
+
+      const form = document.getElementById('scan-form');
+      const formData = new FormData(form);
+
+      const progBox = document.getElementById('progress-container');
+      progBox.style.display = 'block';
+
+      try {
+        const res = await fetch('/api/start-scan', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Scan failed to start');
+
+        logTerminal('Scan initialized: ID ' + data.scan_id);
+        pollScanStatus();
+      } catch (err) {
+        alert('Error starting scan: ' + err.message);
+        btn.disabled = false;
+      }
+    }
+
+    let pollInterval = null;
+
+    function updateScanProgress(data) {
+      document.getElementById('progress-stage').innerText = data.stage || 'Idle';
+      document.getElementById('progress-pct').innerText = (data.progress_pct || 0) + '%';
+      document.getElementById('progress-fill').style.width = (data.progress_pct || 0) + '%';
+
+      if (data.logs) {
+        const term = document.getElementById('terminal');
+        term.innerHTML = data.logs.map(l => `<div class="terminal-line">> ${l}</div>`).join('');
+        term.scrollTop = term.scrollHeight;
+      }
+    }
+
+    function pollScanStatus() {
+      if (pollInterval) clearInterval(pollInterval);
+
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/scan-status');
+          if (!res.ok) return;
+          const data = await res.json();
+          updateScanProgress(data);
+
+          const finished = !data.is_running && (
+            data.progress_pct === 100 || (data.stage || '').startsWith('Completed')
+          );
+
+          if (finished) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+            document.getElementById('btn-scan').disabled = false;
+            saveActiveTab('tab-dashboard');
+            setTimeout(() => window.location.reload(), 800);
+          }
+
+          if (data.error) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+            alert('Scan failed: ' + data.error);
+            document.getElementById('btn-scan').disabled = false;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 1500);
+    }
+
+    async function initPage() {
+      try {
+        const res = await fetch('/api/scan-status');
+        if (!res.ok) {
+          restoreSavedTab();
+          return;
+        }
+        const data = await res.json();
+        if (data.is_running) {
+          switchTab('tab-setup');
+          document.getElementById('progress-container').style.display = 'block';
+          document.getElementById('btn-scan').disabled = true;
+          updateScanProgress(data);
+          pollScanStatus();
+          return;
+        }
+        restoreSavedTab();
+      } catch (e) {
+        console.error(e);
+        restoreSavedTab();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initPage);
+
+    async function verifyResult(resultId, decision) {
+      try {
+        const res = await fetch(`/api/verify/${resultId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        saveActiveTab('tab-dashboard');
+        window.location.reload();
+      } catch (e) {
+        alert('Error saving decision: ' + e.message);
+      }
+    }
+
+    function filterResults(filterType, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const cards = document.querySelectorAll('.res-card');
+      cards.forEach(card => {
+        const v = card.getAttribute('data-verdict');
+        const h = card.getAttribute('data-human');
+
+        if (filterType === 'ALL') card.style.display = 'block';
+        else if (filterType === 'LIKELY_LEAK' && v === 'LIKELY_LEAK') card.style.display = 'block';
+        else if (filterType === 'SIMILAR_TOPIC' && v === 'SIMILAR_TOPIC') card.style.display = 'block';
+        else if (filterType === 'CONFIRMED_LEAK' && h === 'CONFIRMED_LEAK') card.style.display = 'block';
+        else if (filterType === 'FALSE_POSITIVE' && h === 'FALSE_POSITIVE') card.style.display = 'block';
+        else card.style.display = 'none';
+      });
+    }
+
+    function handleSearch() {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      document.querySelectorAll('.res-card').forEach(card => {
+        const txt = card.getAttribute('data-search').toLowerCase();
+        if (txt.includes(q)) card.style.display = 'block';
+        else card.style.display = 'none';
+      });
+    }
+
+    function logTerminal(msg) {
+      const term = document.getElementById('terminal');
+      term.innerHTML += `<div class="terminal-line">> ${msg}</div>`;
+      term.scrollTop = term.scrollHeight;
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,29 @@
+# Secrets & local config
+.env
+*.session
+*.session-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime / scan data
+downloaded_files/*
+!downloaded_files/.gitkeep
+downloaded_images/
+uploaded_references/*
+!uploaded_references/.gitkeep
+results.json
+verified_results.json
+pipeline.log
+
+# Leftover from zip extraction
+Musa Hackathon/
+
+# OS / IDE
+.DS_Store
+.vscode/
+__MACOSX/

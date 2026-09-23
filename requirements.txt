@@ -1,0 +1,29 @@
+# Paper Leak Detection System — Dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Telegram client ──────────────────────────────────────────────────────────
+telethon>=1.36
+
+# ── ML / Vision ──────────────────────────────────────────────────────────────
+transformers>=4.40
+torch>=2.2
+Pillow>=10.0
+torchvision>=0.17
+
+# ── Embeddings ───────────────────────────────────────────────────────────────
+sentence-transformers>=3.0
+numpy>=1.26
+
+# ── PDF / OCR ────────────────────────────────────────────────────────────────
+PyMuPDF>=1.24          # fitz
+pytesseract>=0.3.10    # needs Tesseract binary: brew install tesseract
+
+# ── LLM judge ────────────────────────────────────────────────────────────────
+ollama>=0.3            # needs Ollama running: https://ollama.com
+
+# ── API server & dashboard ───────────────────────────────────────────────────
+fastapi>=0.111
+uvicorn[standard]>=0.29
+jinja2>=3.1
+python-multipart>=0.0.9
+python-dotenv>=1.0
